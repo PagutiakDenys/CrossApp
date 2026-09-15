@@ -1,7 +1,9 @@
 ﻿using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
+using System.Text.Encodings.Web;
 
-Console.OutputEncoding = System.Text.Encoding.UTF8;
+Console.OutputEncoding = Encoding.UTF8;
 
 var info = new
 {
@@ -19,12 +21,17 @@ var info = new
 
 if (args.Contains("--json"))
 {
-    Console.WriteLine(JsonSerializer.Serialize(info));
+    var options = new JsonSerializerOptions
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+    Console.WriteLine(JsonSerializer.Serialize(info, options));
 }
 else
 {
     Console.WriteLine("CrossApp – практикум з крос-платформного програмування");
-    Console.WriteLine("Студент: Пагутяк Денис, група ФЕІ-23");
+    Console.WriteLine("Студент: Пагутяк Денис, група ФЕІ-33");
     Console.WriteLine(new string('-', 52));
     Console.WriteLine($"ОС (OSDescription) : {info.OSDescription}");
     Console.WriteLine($"ОС (Environment) : {info.EnvironmentOS}");
