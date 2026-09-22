@@ -41,22 +41,26 @@ dotnet publish src/Cli -c Release -r win-x64 --self-contained false -o publish/f
 
 ### Порівняння публікацій
 
-| RID       | Режим               | Розмір publish | Потрібен runtime |
-| `win-x64` | self-contained      |      71 Мб     | Ні               |
-| `win-x64` | framework-dependent |    0.209 Мб    | Так, .NET 10     |
-| `win-x64` | single-file         |      71 Мб     | Ні               |
-| `win-x64` | trimmed             |      20 Мб     | Ні               |
+\*| RID       | Режим               | Розмір publish | Потрібен runtime |
+\*| `win-x64` | self-contained      |      71 Мб     | Ні               |
+\*| `win-x64` | framework-dependent |    0.209 Мб    | Так, .NET 10     |
+\*| `win-x64` | single-file         |      71 Мб     | Ні               |
+\*| `win-x64` | trimmed             |      20 Мб     | Ні               |
 
 
 # Середовище
-.NET SDK 10.0
-C#
-Git
-GitHub
-Windows 11 x64
+\*.NET SDK 10.0
+\*C#
+\*Git
+\*GitHub
+\*Windows 11 x64
 
 
 # Коміти
+lab2 бібліотека Core + Cli
+(origin/main) оновлення Program.cs для укр,мови
+lab01: additional self-contained and JSON mode
+lab01: add README
 lab01: solution CrossApp, Cli, вибір домену
 
 # Додаткові завдання
