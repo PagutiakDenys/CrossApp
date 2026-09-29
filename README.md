@@ -13,17 +13,24 @@
 Застосунок призначений для обліку залишків товарів по партіях, складам та переміщенням.
 
 # Структура проєкту
-rossApp/ 
-├── CrossApp.slnx 
-├── README.md 
-└── src/
-   ├── Cli/ 
-   │ ├── Cli.csproj 
-   │ └── Program.cs 
-   └── Core/ 
-      ├── Core.csproj
-      ├── EnvironmentInfo.cs
-      └── EnvironmentReport.cs
+CrossApp/
+├── data/
+│   ├── sample.csv
+│   └── sample.json
+├── src/
+│   ├── Cli/
+│   │   ├── Cli.csproj
+│   │   └── Program.cs
+│   └── Core/
+│       ├── Core.csproj
+│       ├── Dto/
+│       │   ├── ProductDto.cs
+│       │   └── ImportResult.cs
+│       └── Import/
+│           ├── ProductCsvImporter.cs
+│           └── ProductJsonImporter.cs
+├── CrossApp.slnx
+└── README.md
 # Запуск
 Збірка проєкту:
 
@@ -72,6 +79,14 @@ lab01: add README
 lab01: solution CrossApp, Cli, вибір домену
 
 # Додаткові завдання
+## lab3
+Для JSON:
+
+dotnet run --project src/Cli -- data/sample.json
+
+Для CSV:
+
+dotnet run --project src/Cli -- data/sample.csv
 ## lab2
 Single-file:
 
