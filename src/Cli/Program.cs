@@ -1,7 +1,8 @@
-﻿
-using Core.Dto;
+﻿using Core.Dto;
 using Core.Import;
 using Core.Domain;
+using Core.Domain.Library;
+using Core.Domain.Orders;
 
 string path = args.Length > 0
     ? args[0]
@@ -11,7 +12,7 @@ Console.WriteLine("=== Лабораторна робота №4 ===");
 Console.WriteLine("Модель предметної області Product");
 Console.WriteLine();
 
-// Демонстрація сутності Product
+// Сценарій 1: успішні операції
 Console.WriteLine("=== Сценарій 1: успішні операції ===");
 
 Product product = Product.Create(
@@ -23,16 +24,18 @@ Product product = Product.Create(
 
 Console.WriteLine($"Створено: {product}");
 
-product.RegisterArrival(50);
-Console.WriteLine("Додано 50 одиниць.");
+product.RegisterArrival(60);
+Console.WriteLine("Додано 60 одиниць.");
 
 product.Issue(30);
 Console.WriteLine("Видано 30 одиниць.");
 
-
 Console.WriteLine($"Результат: {product}");
+Console.WriteLine();
 
-// Демонстрація перетворення Product у DTO та відновлення
+// Перетворення Product у DTO та відновлення
+Console.WriteLine("=== Перевірка DTO ===");
+
 ProductDto dto = product.ToDto();
 
 Console.WriteLine(
@@ -43,8 +46,7 @@ Product restored = Product.FromDto(dto);
 Console.WriteLine($"Відновлений товар: {restored}");
 Console.WriteLine();
 
-
-// Демонстрація порушення інваріантів
+// Сценарій 2: порушення інваріантів
 Console.WriteLine("=== Сценарій 2: перевірка інваріантів ===");
 
 TryDo(
@@ -53,11 +55,13 @@ TryDo(
 
 TryDo(
     "Порожній SKU",
-    () => Product.Create("P-002", " ", "Пісок", "т", 10));
+    () => Product.Create(
+        "P-002", " ", "Пісок", "т", 10));
 
 TryDo(
     "Від'ємний початковий залишок",
-    () => Product.Create("P-003", "SKU-003", "Цегла", "шт", -5));
+    () => Product.Create(
+        "P-003", "SKU-003", "Цегла", "шт", -5));
 
 TryDo(
     "Нульова кількість приходу",
@@ -65,12 +69,14 @@ TryDo(
 
 Console.WriteLine();
 
-// Імпорт даних із CSV або JSON
+// Імпорт товарів із CSV або JSON
 Console.WriteLine("=== Імпорт товарів із файлу ===");
 
 if (!File.Exists(path))
 {
-    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
+    Console.WriteLine(
+        $"Файл не знайдено: {Path.GetFullPath(path)}");
+
     return 1;
 }
 
@@ -86,9 +92,9 @@ ImportResult<ProductDto> result = extension switch
         [$"Непідтримуваний формат файлу: {extension}"])
 };
 
-int total = result.Items.Count + result.Errors.Count;
 int accepted = result.Items.Count;
 int skipped = result.Errors.Count;
+int total = accepted + skipped;
 
 double errorPercent = total == 0
     ? 0
@@ -110,6 +116,7 @@ foreach (ProductDto item in result.Items.Take(5))
 
 if (result.Errors.Count > 0)
 {
+    Console.WriteLine();
     Console.WriteLine($"Пропущено рядків: {skipped}");
 
     foreach (string error in result.Errors)
@@ -118,14 +125,79 @@ if (result.Errors.Count > 0)
     }
 }
 
+Console.WriteLine();
 Console.WriteLine(
     $"Усього: {total} | " +
     $"Прийнято: {accepted} | " +
     $"Пропущено: {skipped} | " +
     $"Помилки: {errorPercent:F1}%");
 
+// Додаткове завдання 1:
+// Перетворення DTO на доменні сутності
+Console.WriteLine();
+Console.WriteLine("=== Додаткове завдання 1: ProductImportMapper ===");
+
+ProductMappingResult mapped = ProductImportMapper.Map(result);
+
+Console.WriteLine($"Створено сутностей: {mapped.Items.Count}");
+Console.WriteLine($"Усього помилок імпорту та мапінгу: {mapped.Errors.Count}");
+
+foreach (string error in mapped.Errors)
+{
+    Console.WriteLine($" ! {error}");
+}
+
+// Додаткове завдання 2:
+// Обмеження кількості відкритих видач
+Console.WriteLine();
+Console.WriteLine("=== Додаткове завдання 2: LoanService ===");
+
+Reader reader = Reader.Create("R-001");
+var loans = new List<Loan>();
+
+for (int i = 1; i <= 5; i++)
+{
+    BookCopy copy = BookCopy.Create($"B-{i:000}");
+    Loan loan = LoanService.IssueCopy(reader, copy, loans);
+    loans.Add(loan);
+}
+
+Console.WriteLine($"Відкритих видач читача: {loans.Count}");
+
+TryDo(
+    "Спроба оформити шосту видачу",
+    () =>
+    {
+        BookCopy copy = BookCopy.Create("B-006");
+        Loan loan = LoanService.IssueCopy(reader, copy, loans);
+        loans.Add(loan);
+    });
+
+// Додаткове завдання 3:
+// Перевірка переходів статусів замовлення
+Console.WriteLine();
+Console.WriteLine("=== Додаткове завдання 3: OrderStatus ===");
+
+Order order = Order.Create("ORD-001");
+
+Console.WriteLine($"Початковий статус: {order.Status}");
+
+order.Confirm();
+Console.WriteLine($"Після підтвердження: {order.Status}");
+
+order.Cancel();
+Console.WriteLine($"Після скасування: {order.Status}");
+
+TryDo(
+    "Повторне підтвердження скасованого замовлення",
+    () => order.Confirm());
+
+Console.WriteLine();
+Console.WriteLine("=== Перевірку завершено ===");
+
 return 0;
 
+// Допоміжний метод для перевірки інваріантів
 static void TryDo(string title, Action action)
 {
     try
