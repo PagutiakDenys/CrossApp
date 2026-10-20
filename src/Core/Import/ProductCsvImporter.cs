@@ -21,9 +21,12 @@ public static class ProductCsvImporter
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
                 continue;
 
+            // Пропускаємо заголовок
             if (number == 1 &&
                 line.StartsWith("id", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             switch (ParseLine(line))
             {
@@ -48,19 +51,24 @@ public static class ProductCsvImporter
 
         return parts switch
         {
+            // Менше 5 колонок
             { Length: < 5 } =>
                 new ParseFailed(
                     $"очікую 5 колонок, отримав {parts.Length}"),
 
+            // Порожній SKU або назва
             [_, "", _, _, _] or
             [_, _, "", _, _] =>
-                new ParseFailed("SKU або назва порожні"),
+                new ParseFailed(
+                    "SKU або назва порожні"),
 
+            // Кількість не число або від'ємна
             [_, _, _, _, var qty]
                 when !int.TryParse(qty, out int q) || q < 0 =>
                 new ParseFailed(
                     $"кількість '{qty}' не є невід'ємним числом"),
 
+            // Правильний рядок
             [var id, var sku, var name, var unit, var qty] =>
                 new ParseOk(
                     new ProductDto(
@@ -70,6 +78,7 @@ public static class ProductCsvImporter
                         unit,
                         int.Parse(qty))),
 
+            // Більше 5 колонок
             _ =>
                 new ParseFailed(
                     $"занадто багато колонок: {parts.Length}")
