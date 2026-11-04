@@ -1,3 +1,4 @@
+
 using Core.Dto;
 
 namespace Core.Import;
@@ -15,27 +16,58 @@ public static class MixedImporter
 
             string[] parts = line.Split(';');
 
-            switch (parts)
+            // Пропускаємо заголовок CSV
+            if (parts[0].Equals("id", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Формат P;id;sku;name;unit;quantity
+            if (parts.Length == 6 && parts[0] == "P")
             {
-                case ["P", var id, var sku, var name, var unit, var quantity]
-                    when int.TryParse(quantity, out int q) && q >= 0:
+                if (int.TryParse(parts[5], out int q) &&
+                    q >= 0 &&
+                    !string.IsNullOrWhiteSpace(parts[1]) &&
+                    !string.IsNullOrWhiteSpace(parts[2]) &&
+                    !string.IsNullOrWhiteSpace(parts[3]) &&
+                    !string.IsNullOrWhiteSpace(parts[4]))
+                {
+                    result.Add(new ProductDto(
+                        parts[1].Trim(),
+                        parts[2].Trim(),
+                        parts[3].Trim(),
+                        parts[4].Trim(),
+                        q));
+                }
 
-                    result.Add(
-                        new ProductDto(
-                            id,
-                            sku,
-                            name,
-                            unit,
-                            q));
-                    break;
+                continue;
+            }
 
-                case ["W", var id, var name]:
+            // Формат id;sku;name;unit;quantity
+            if (parts.Length == 5)
+            {
+                if (int.TryParse(parts[4], out int q) &&
+                    q >= 0 &&
+                    !string.IsNullOrWhiteSpace(parts[0]) &&
+                    !string.IsNullOrWhiteSpace(parts[1]) &&
+                    !string.IsNullOrWhiteSpace(parts[2]) &&
+                    !string.IsNullOrWhiteSpace(parts[3]))
+                {
+                    result.Add(new ProductDto(
+                        parts[0].Trim(),
+                        parts[1].Trim(),
+                        parts[2].Trim(),
+                        parts[3].Trim(),
+                        q));
+                }
 
-                    result.Add(
-                        new WarehouseDto(
-                            id,
-                            name));
-                    break;
+                continue;
+            }
+
+            // Формат W;id;name
+            if (parts.Length == 3 && parts[0] == "W")
+            {
+                result.Add(new WarehouseDto(
+                    parts[1],
+                    parts[2]));
             }
         }
 
