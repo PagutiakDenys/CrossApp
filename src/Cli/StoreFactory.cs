@@ -1,3 +1,4 @@
+
 using Core;
 using Core.Abstractions;
 using Core.Storage;
@@ -7,6 +8,9 @@ public static class StoreFactory
     public static ICatalogStore Create(string[] args)
     {
         bool useFile = args.Contains("--file");
+        bool useCaching = args.Contains("--caching");
+
+        ICatalogStore store;
 
         if (useFile)
         {
@@ -16,9 +20,18 @@ public static class StoreFactory
             string dataPath = Path.Combine(
                 projectRoot, "data", "catalog.json");
 
-            return new FileCatalogStore(dataPath);
+            store = new FileCatalogStore(dataPath);
+        }
+        else
+        {
+            store = new InMemoryCatalogStore(SampleData.Products());
         }
 
-        return new InMemoryCatalogStore(SampleData.Products());
+        if (useCaching)
+        {
+            store = new CachingCatalogStore(store);
+        }
+
+        return store;
     }
 }

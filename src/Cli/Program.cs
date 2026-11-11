@@ -1,4 +1,5 @@
-﻿using Core.Abstractions;
+﻿
+using Core.Abstractions;
 using Core.Domain;
 using Core.Services;
 using Core.Storage;
@@ -6,18 +7,17 @@ using Core.Storage;
 try
 {
     // 1. Створюємо сховище через фабрику
-    ICatalogStore baseStore = StoreFactory.Create(args);
+    ICatalogStore store = StoreFactory.Create(args);
 
-    // 2. Додаємо декоратор кешування
-    ICatalogStore store = new CachingCatalogStore(baseStore);
-
-    // 3. Створюємо сервіс
+    // 2. Створюємо сервіс
     var service = new CatalogService(store);
 
-    Console.WriteLine($"Сховище: {baseStore.GetType().Name}");
-    Console.WriteLine("Кешування: увімкнено");
+    Console.WriteLine($"Сховище: {store.GetType().Name}");
+    Console.WriteLine(
+        $"Кешування: {(args.Contains("--caching") ? "увімкнено" : "вимкнено")}"
+    );
 
-    // 4. Додаємо товар
+    // 3. Додаємо товар
     var created = service.Add(
         "SKU-101",
         "Кабель UTP cat6",
@@ -29,11 +29,11 @@ try
         $"\nДодано товар: {created.Name}, ID: {created.Id}"
     );
 
-    // 5. Реєструємо надходження
+    // 4. Реєструємо надходження
     service.Receive(created.Id, 25);
     Console.WriteLine("Надходження: +25");
 
-    // 6. Пошук товарів за кількістю
+    // 5. Пошук товарів за кількістю
     Console.WriteLine("\nТовари з кількістю більше 100:");
 
     var found = service.Search(p => p.Quantity > 100);
@@ -43,7 +43,7 @@ try
         Console.WriteLine($"{p.Name} — {p.Quantity} {p.Unit}");
     }
 
-    // 7. Виводимо всі товари
+    // 6. Виводимо всі товари
     Console.WriteLine("\nСписок товарів:");
 
     foreach (var p in service.All())
@@ -53,7 +53,7 @@ try
         );
     }
 
-    // 8. Перевірка відсутнього товару
+    // 7. Перевірка відсутнього товару
     Console.WriteLine("\nПеревірка відсутнього товару:");
 
     try
@@ -65,7 +65,7 @@ try
         Console.WriteLine($"Помилка: {ex.Message}");
     }
 
-    // 9. Перевірка дублювання ID
+    // 8. Перевірка дублювання ID
     Console.WriteLine("\nПеревірка дублювання ID:");
 
     try
