@@ -7,16 +7,24 @@ namespace Core.Services;
 public sealed class CatalogService
 {
     private readonly ICatalogStore _store;
+    private readonly INotificationSink? _sink;
 
     public event EventHandler<CatalogChangedEventArgs>? Changed;
 
-    public CatalogService(ICatalogStore store)
+    // sink необов'язковий: без нього сервіс працює лише з подією
+    public CatalogService(ICatalogStore store, INotificationSink? sink = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _sink = sink;
     }
 
-    private void OnChanged(string id, CatalogChangeKind kind, int delta, int quantityAfter) =>
-        Changed?.Invoke(this, new CatalogChangedEventArgs(id, kind, delta, quantityAfter));
+    private void OnChanged(string id, CatalogChangeKind kind, int delta, int quantityAfter)
+    {
+        var e = new CatalogChangedEventArgs(id, kind, delta, quantityAfter);
+
+        _sink?.Notify(e);              // 1) явна залежність, один одержувач
+        Changed?.Invoke(this, e);      // 2) подія, будь-яка кількість підписників
+    }
 
     public Product Add(string sku, string name, string unit, int quantity)
     {
@@ -24,7 +32,7 @@ public sealed class CatalogService
             Guid.NewGuid().ToString("N")[..8], sku, name, unit, quantity);
 
         _store.Add(product);
-        OnChanged(product.Id, CatalogChangeKind.Added, quantity, product.Quantity); // після зміни, не до
+        OnChanged(product.Id, CatalogChangeKind.Added, quantity, product.Quantity);
         return product;
     }
 
@@ -33,7 +41,7 @@ public sealed class CatalogService
         var product = _store.GetById(id)
             ?? throw new InvalidOperationException($"Немає запису з id={id}.");
 
-        product.RegisterArrival(quantity);   // виняток тут → події не буде
+        product.RegisterArrival(quantity);   // виняток тут → повідомлень не буде
         _store.Update(product);
         OnChanged(product.Id, CatalogChangeKind.Received, quantity, product.Quantity);
     }
@@ -61,7 +69,6 @@ public sealed class CatalogService
 
     public Product? Find(string id) => _store.GetById(id);
 
-    // Критерій задає той, хто викликає (делегат повертає значення, на відміну від події)
     public IReadOnlyList<Product> FindAll(Func<Product, bool> predicate)
     {
         ArgumentNullException.ThrowIfNull(predicate);

@@ -6,7 +6,9 @@ public static class ProductCsvImporter
 {
     private const char Separator = ';';
 
-    public static ImportResult<ProductDto> Load(string path)
+    public static ImportResult<ProductDto> Load(
+        string path,
+        Action<string>? onSkipped = null)
     {
         var items = new List<ProductDto>();
         var errors = new List<string>();
@@ -28,15 +30,17 @@ public static class ProductCsvImporter
                 continue;
             }
 
-            switch (ParseLine(line))
-            {
-                case ParseOk ok:
-                    items.Add(ok.Value);
-                    break;
+            ParseOutcome outcome = ParseLine(line);
 
-                case ParseFailed failed:
-                    errors.Add($"рядок {number}: {failed.Reason}");
-                    break;
+            if (outcome is ParseOk ok)
+            {
+                items.Add(ok.Value);
+            }
+            else if (outcome is ParseFailed failed)
+            {
+                string message = $"рядок {number}: {failed.Reason}";
+                errors.Add(message);
+                onSkipped?.Invoke(message);   // звіт про пропущений рядок
             }
         }
 
@@ -51,45 +55,26 @@ public static class ProductCsvImporter
 
         return parts switch
         {
-            // Менше 5 колонок
             { Length: < 5 } =>
-                new ParseFailed(
-                    $"очікую 5 колонок, отримав {parts.Length}"),
+                new ParseFailed($"очікую 5 колонок, отримав {parts.Length}"),
 
-            // Порожній SKU або назва
             [_, "", _, _, _] or
             [_, _, "", _, _] =>
-                new ParseFailed(
-                    "SKU або назва порожні"),
+                new ParseFailed("SKU або назва порожні"),
 
-            // Кількість не число або від'ємна
             [_, _, _, _, var qty]
                 when !int.TryParse(qty, out int q) || q < 0 =>
-                new ParseFailed(
-                    $"кількість '{qty}' не є невід'ємним числом"),
+                new ParseFailed($"кількість '{qty}' не є невід'ємним числом"),
 
-            // Правильний рядок
             [var id, var sku, var name, var unit, var qty] =>
-                new ParseOk(
-                    new ProductDto(
-                        id,
-                        sku,
-                        name,
-                        unit,
-                        int.Parse(qty))),
+                new ParseOk(new ProductDto(id, sku, name, unit, int.Parse(qty))),
 
-            // Більше 5 колонок
             _ =>
-                new ParseFailed(
-                    $"занадто багато колонок: {parts.Length}")
+                new ParseFailed($"занадто багато колонок: {parts.Length}")
         };
     }
 
     private abstract record ParseOutcome;
-
-    private sealed record ParseOk(ProductDto Value)
-        : ParseOutcome;
-
-    private sealed record ParseFailed(string Reason)
-        : ParseOutcome;
+    private sealed record ParseOk(ProductDto Value) : ParseOutcome;
+    private sealed record ParseFailed(string Reason) : ParseOutcome;
 }

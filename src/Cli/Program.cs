@@ -1,65 +1,78 @@
 ﻿using Core.Abstractions;
 using Core.Domain;
 using Core.Events;
+using Core.Import;
 using Core.Services;
 
 try
 {
+    // ---------- Складання залежностей (composition root) ----------
     ICatalogStore store = StoreFactory.Create(args);
-    var service = new CatalogService(store);
 
-    // Крок 3: підписник №1 – локальний метод (його можна відписати)
-    var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app.log");
+    var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "sink.log");
     Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
-    File.WriteAllText(logPath, string.Empty);   // чистий лог на кожен запуск
+    File.WriteAllText(logPath, string.Empty);                 // чистий лог на запуск
 
-    var order = new List<string>();             // щоб показати порядок викликів
+    INotificationSink sink = new CompositeSink(
+        new ConsoleSink(),
+        new FileSink(logPath));
 
-    void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
-    {
-        var line = $"{e.At:HH:mm:ss} {e.Kind,-8} {e.Id} {e.Delta,4:+0;-0} → залишок {e.QuantityAfter}";
-        Console.WriteLine(line);
-        File.AppendAllText(logPath, line + Environment.NewLine);
-        order.Add("лог");
-    }
+    var service = new CatalogService(store, sink);            // sink передано через конструктор
 
-    service.Changed += OnCatalogChanged;
-
-    // Крок 4: підписник №2 – лямбда із замиканням над changes
+    // ---------- Для порівняння: подія з лічильником ----------
     int changes = 0;
-    service.Changed += (_, _) => { changes++; order.Add("лічильник"); };
+    EventHandler<CatalogChangedEventArgs> counter = (_, _) => changes++;
+    service.Changed += counter;
 
-    // Крок 5: сценарій
+    // ---------- Сценарій ----------
+    Console.WriteLine("=== Завдання 1: sink vs подія ===");
+
     var created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
     service.Receive(created.Id, 25);
-    Console.WriteLine($"Подій отримано: {changes}");                       // 2
-    Console.WriteLine($"Порядок викликів: {string.Join(" → ", order)}");   // лог → лічильник → лог → лічильник
+    Console.WriteLine($"Подій отримано лічильником: {changes}");            // 2
 
-    // Крок 6: відмови (підписка ще активна, але подій бути не повинно)
-    Console.WriteLine("\nСценарій відмови:");
-    foreach (var (id, qty) in new[] { (created.Id, -5), ("UNKNOWN-ID", 10) })
+    // Відмова: ні sink, ні подія не спрацьовують
+    try
     {
-        try
-        {
-            service.Receive(id, qty);
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-        {
-            Console.WriteLine($"Помилка: {ex.Message}");
-        }
+        service.Receive(created.Id, -5);
     }
-    Console.WriteLine($"Подій після відмов: {changes}\n");                  // усе ще 2
+    catch (ArgumentException ex)
+    {
+        Console.WriteLine($"Помилка: {ex.Message}");
+    }
+    Console.WriteLine($"Подій після відмови: {changes}");                   // 2
 
-    // Відписка і «тиха» операція
-    service.Changed -= OnCatalogChanged;
+    // Подію можна відписати, sink – ні (він зафіксований у конструкторі)
+    service.Changed -= counter;
     service.Receive(created.Id, 5);
-    Console.WriteLine($"Подій отримано: {changes}");                       // 3 (лише лічильник)
 
-    // Крок 7: делегат, що повертає значення
-    service.Add("SKU-102", "Роз'єм RJ45", "шт", 8);
-    Console.WriteLine("\nТовари із залишком < 10:");
-    foreach (var p in service.FindAll(p => p.Quantity < 10))
-        Console.WriteLine($" {p.Name} — {p.Quantity} {p.Unit}");
+    Console.WriteLine($"Подій отримано лічильником: {changes}");            // 2 (відписались)
+    Console.WriteLine($"Рядків у sink.log: {File.ReadAllLines(logPath).Length}"); // 3 (sink працює далі)
+
+    // ---------- Завдання 2: Action<string> ----------
+    Console.WriteLine("\n=== Завдання 2: звіт про пропущені рядки ===");
+
+    var csvPath = Path.Combine(AppContext.BaseDirectory, "data", "sample.csv");
+
+    // Варіант А: у консоль
+    var result = ProductCsvImporter.Load(
+        csvPath,
+        msg => Console.WriteLine($"Пропущено: {msg}"));
+
+    Console.WriteLine($"Прийнято: {result.Items.Count}, відхилено: {result.Errors.Count}");
+
+    // Варіант Б: у список (той самий метод, інша поведінка)
+    var skipped = new List<string>();
+    ProductCsvImporter.Load(csvPath, skipped.Add);
+    Console.WriteLine($"Зібрано в список: {skipped.Count}");
+
+    // Варіант В: у файл
+    var skipLog = Path.Combine(AppContext.BaseDirectory, "logs", "skipped.log");
+    ProductCsvImporter.Load(csvPath, msg => File.AppendAllText(skipLog, msg + Environment.NewLine));
+    Console.WriteLine($"Файл skipped.log створено: {File.Exists(skipLog)}");
+
+    // Варіант Г: без звіту (параметр необов'язковий)
+    ProductCsvImporter.Load(csvPath);
 }
 catch (Exception ex)
 {
