@@ -82,5 +82,19 @@
     "Name": "\u041A\u0430\u0431\u0435\u043B\u044C UTP cat6",
     "Unit": "\u043C",
     "Quantity": 75
+  },
+  {
+    "Id": "629c1b4d",
+    "Sku": "SKU-101",
+    "Name": "\u041A\u0430\u0431\u0435\u043B\u044C UTP cat6",
+    "Unit": "\u043C",
+    "Quantity": 75
+  },
+  {
+    "Id": "39ffcb17",
+    "Sku": "SKU-101",
+    "Name": "\u041A\u0430\u0431\u0435\u043B\u044C UTP cat6",
+    "Unit": "\u043C",
+    "Quantity": 75
   }
 ]

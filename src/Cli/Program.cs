@@ -1,91 +1,65 @@
-﻿
-using Core.Abstractions;
+﻿using Core.Abstractions;
 using Core.Domain;
+using Core.Events;
 using Core.Services;
-using Core.Storage;
 
 try
 {
-    // 1. Створюємо сховище через фабрику
     ICatalogStore store = StoreFactory.Create(args);
-
-    // 2. Створюємо сервіс
     var service = new CatalogService(store);
 
-    Console.WriteLine($"Сховище: {store.GetType().Name}");
-    Console.WriteLine(
-        $"Кешування: {(args.Contains("--caching") ? "увімкнено" : "вимкнено")}"
-    );
+    // Крок 3: підписник №1 – локальний метод (його можна відписати)
+    var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app.log");
+    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+    File.WriteAllText(logPath, string.Empty);   // чистий лог на кожен запуск
 
-    // 3. Додаємо товар
-    var created = service.Add(
-        "SKU-101",
-        "Кабель UTP cat6",
-        "м",
-        50
-    );
+    var order = new List<string>();             // щоб показати порядок викликів
 
-    Console.WriteLine(
-        $"\nДодано товар: {created.Name}, ID: {created.Id}"
-    );
+    void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
+    {
+        var line = $"{e.At:HH:mm:ss} {e.Kind,-8} {e.Id} {e.Delta,4:+0;-0} → залишок {e.QuantityAfter}";
+        Console.WriteLine(line);
+        File.AppendAllText(logPath, line + Environment.NewLine);
+        order.Add("лог");
+    }
 
-    // 4. Реєструємо надходження
+    service.Changed += OnCatalogChanged;
+
+    // Крок 4: підписник №2 – лямбда із замиканням над changes
+    int changes = 0;
+    service.Changed += (_, _) => { changes++; order.Add("лічильник"); };
+
+    // Крок 5: сценарій
+    var created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
     service.Receive(created.Id, 25);
-    Console.WriteLine("Надходження: +25");
+    Console.WriteLine($"Подій отримано: {changes}");                       // 2
+    Console.WriteLine($"Порядок викликів: {string.Join(" → ", order)}");   // лог → лічильник → лог → лічильник
 
-    // 5. Пошук товарів за кількістю
-    Console.WriteLine("\nТовари з кількістю більше 100:");
-
-    var found = service.Search(p => p.Quantity > 100);
-
-    foreach (var p in found)
+    // Крок 6: відмови (підписка ще активна, але подій бути не повинно)
+    Console.WriteLine("\nСценарій відмови:");
+    foreach (var (id, qty) in new[] { (created.Id, -5), ("UNKNOWN-ID", 10) })
     {
-        Console.WriteLine($"{p.Name} — {p.Quantity} {p.Unit}");
+        try
+        {
+            service.Receive(id, qty);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Console.WriteLine($"Помилка: {ex.Message}");
+        }
     }
+    Console.WriteLine($"Подій після відмов: {changes}\n");                  // усе ще 2
 
-    // 6. Виводимо всі товари
-    Console.WriteLine("\nСписок товарів:");
+    // Відписка і «тиха» операція
+    service.Changed -= OnCatalogChanged;
+    service.Receive(created.Id, 5);
+    Console.WriteLine($"Подій отримано: {changes}");                       // 3 (лише лічильник)
 
-    foreach (var p in service.All())
-    {
-        Console.WriteLine(
-            $" {p.Id} {p.Sku,-10} {p.Name,-22} {p.Quantity,5} {p.Unit}"
-        );
-    }
-
-    // 7. Перевірка відсутнього товару
-    Console.WriteLine("\nПеревірка відсутнього товару:");
-
-    try
-    {
-        service.Receive("UNKNOWN-ID", 10);
-    }
-    catch (InvalidOperationException ex)
-    {
-        Console.WriteLine($"Помилка: {ex.Message}");
-    }
-
-    // 8. Перевірка дублювання ID
-    Console.WriteLine("\nПеревірка дублювання ID:");
-
-    try
-    {
-        var duplicate = Product.Create(
-            created.Id,
-            "SKU-999",
-            "Тестовий товар",
-            "шт",
-            10
-        );
-
-        store.Add(duplicate);
-    }
-    catch (InvalidOperationException ex)
-    {
-        Console.WriteLine($"Помилка: {ex.Message}");
-    }
-
-    Console.WriteLine("\nРоботу завершено.");
+    // Крок 7: делегат, що повертає значення
+    service.Add("SKU-102", "Роз'єм RJ45", "шт", 8);
+    Console.WriteLine("\nТовари із залишком < 10:");
+    foreach (var p in service.FindAll(p => p.Quantity < 10))
+        Console.WriteLine($" {p.Name} — {p.Quantity} {p.Unit}");
 }
 catch (Exception ex)
 {
