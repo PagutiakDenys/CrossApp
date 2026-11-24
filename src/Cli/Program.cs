@@ -1,4 +1,5 @@
-﻿using Core;
+﻿
+using Core;
 using Core.Abstractions;
 using Core.Domain;
 using Core.Events;
@@ -38,6 +39,7 @@ try
 
         switch (command)
         {
+            // 1. ТОП-5 товарів
             case "report-top":
             {
                 Console.WriteLine("=== ТОП-5 товарів ===");
@@ -46,6 +48,7 @@ try
                 break;
             }
 
+            // 2. Товари з малим залишком
             case "report-low":
             {
                 Console.WriteLine("=== Товари з малим залишком ===");
@@ -54,6 +57,7 @@ try
                 break;
             }
 
+            // 3. Групування за одиницями
             case "report-groups":
             {
                 Console.WriteLine("=== Групування за одиницями ===");
@@ -68,6 +72,7 @@ try
                 break;
             }
 
+            // 4. Загальна статистика
             case "report-sum":
             {
                 Console.WriteLine("=== Загальна статистика ===");
@@ -83,6 +88,7 @@ try
                 break;
             }
 
+            // 5. Відкладене виконання LINQ
             case "report-deferred":
             {
                 Console.WriteLine(
@@ -99,6 +105,94 @@ try
 
                 Console.WriteLine(
                     $"У знімку лишилось: {result.SnapshotCount}");
+
+                break;
+            }
+
+            // 6. Join товарів та переміщень
+            case "report-join":
+            {
+                var products = items.ToList();
+
+                var movements =
+                    ReportService.CreateSampleMovements(products);
+
+                var result =
+                    ReportService.JoinMovements(products, movements);
+
+                Console.WriteLine(
+                    "=== Товари та їхні переміщення ===");
+
+                foreach (var item in result.Take(5))
+                {
+                    Console.WriteLine(
+                        $"{item.Sku,-10} {item.Name,-15} " +
+                        $"Залишок: {item.CurrentQuantity,4} " +
+                        $"Надійшло: {item.Received,4} " +
+                        $"Видано: {item.Issued,4} " +
+                        $"Операцій: {item.MovementCount}");
+                }
+
+                break;
+            }
+
+            // 7. ТОП-3 групи
+            case "report-top-groups":
+            {
+                var result =
+                    ReportService.TopGroups(items, 3);
+
+                Console.WriteLine(
+                    "=== ТОП-3 групи за кількістю ===");
+
+                foreach (var group in result)
+                {
+                    Console.WriteLine(
+                        $"{group.Key,-5} позицій: {group.Count,3} " +
+                        $"сумарно: {group.TotalQuantity,6}");
+                }
+
+                break;
+            }
+
+            // 8. Групування через query syntax
+            case "report-groups-query":
+            {
+                var result =
+                    ReportService.ByUnitQuery(items);
+
+                Console.WriteLine(
+                    "=== Групування query syntax ===");
+
+                foreach (var group in result)
+                {
+                    Console.WriteLine(
+                        $"{group.Key,-5} позицій: {group.Count,3} " +
+                        $"сумарно: {group.TotalQuantity,6}");
+                }
+
+                break;
+            }
+
+            // 9. Порівняння продуктивності
+            case "report-benchmark":
+            {
+                var result = ReportService.Benchmark();
+
+                Console.WriteLine(
+                    "=== Порівняння часу LINQ ===");
+
+                Console.WriteLine(
+                    $"З проміжним ToList(): " +
+                    $"{result.WithIntermediateTicks} ticks");
+
+                Console.WriteLine(
+                    $"Без проміжного ToList(): " +
+                    $"{result.WithoutIntermediateTicks} ticks");
+
+                Console.WriteLine(
+                    $"Кількість результатів: " +
+                    $"{result.WithCount} / {result.WithoutCount}");
 
                 break;
             }
@@ -121,7 +215,8 @@ try
         service.Changed += counter;
 
         // ---------- Завдання 1 ----------
-        Console.WriteLine("=== Завдання 1: sink vs подія ===");
+        Console.WriteLine(
+            "=== Завдання 1: sink vs подія ===");
 
         var created = service.Add(
             "SKU-101",
@@ -233,4 +328,9 @@ static void PrintHelp()
     Console.WriteLine("report-groups");
     Console.WriteLine("report-sum");
     Console.WriteLine("report-deferred");
+
+    Console.WriteLine("report-join");
+    Console.WriteLine("report-top-groups");
+    Console.WriteLine("report-groups-query");
+    Console.WriteLine("report-benchmark");
 }
